@@ -1,0 +1,37 @@
+# shell-mcp configuration example
+# Copy this to config.yaml and customize as needed.
+
+# Shell to use. Empty string = auto-detect ($SHELL -> /bin/sh)
+shell: ""
+
+# Default command timeout in seconds
+default_timeout: 30.0
+
+# Max output length in characters (stdout + stderr combined)
+max_output_length: 50000
+
+# Keepalive interval in seconds (progress pings during long foreground commands)
+keepalive_interval: 5.0
+
+# Commands to block (checked against all commands in pipes, &&, ||, etc.)
+blacklist:
+  - rm
+  - mkfs
+  - dd
+  - format
+
+# If non-empty, ONLY these commands are allowed (overrides blacklist)
+whitelist: []
+
+# Transport: "stdio" for local, "streamable-http" for remote
+transport: stdio
+
+# Host and port for streamable-http transport
+host: 127.0.0.1
+port: 8000
+
+# Environment variables injected into subprocesses to prevent interactive prompts
+non_interactive_env:
+  GIT_TERMINAL_PROMPT: "0"
+  CI: "true"
+  DEBIAN_FRONTEND: noninteractive
