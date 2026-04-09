@@ -9,6 +9,9 @@ class TestExtractCommandNames:
     def test_simple_command(self):
         assert extract_command_names("ls -la") == ["ls"]
 
+    def test_newline_separated_commands(self):
+        assert extract_command_names("echo ok\nrm -rf /tmp/x") == ["echo", "rm"]
+
     def test_pipe(self):
         assert extract_command_names("cat file | grep pattern") == ["cat", "grep"]
 
@@ -50,10 +53,18 @@ class TestExtractCommandNames:
         result = extract_command_names("FOO=1 BAR=2 node app.js")
         assert result == ["node"]
 
+    def test_env_wrapper_command(self):
+        result = extract_command_names("env FOO=1 rm -rf /tmp/x")
+        assert result == ["env", "rm"]
+
     def test_subshell_dollar_paren(self):
         result = extract_command_names("echo $(whoami)")
         assert "echo" in result
         assert "whoami" in result
+
+    def test_nested_subshell_dollar_paren(self):
+        result = extract_command_names("echo $(printf '%s' \"$(whoami)\")")
+        assert result == ["echo", "printf", "whoami"]
 
     def test_backtick_subshell(self):
         result = extract_command_names("echo `date`")
@@ -134,6 +145,25 @@ class TestValidateCommand:
             'bash -c "rm -rf /"', blacklist=["rm"], whitelist=[]
         )
         assert not allowed
+
+    def test_blacklist_blocks_newline_command(self):
+        allowed, _ = validate_command(
+            "echo ok\nrm -rf /tmp/x", blacklist=["rm"], whitelist=[]
+        )
+        assert not allowed
+
+    def test_blacklist_blocks_env_wrapper_command(self):
+        allowed, _ = validate_command(
+            "env FOO=1 rm -rf /tmp/x", blacklist=["rm"], whitelist=[]
+        )
+        assert not allowed
+
+    def test_blacklist_blocks_full_path_command(self):
+        allowed, reason = validate_command(
+            "/usr/bin/rm -rf /tmp/x", blacklist=["/usr/bin/rm"], whitelist=[]
+        )
+        assert not allowed
+        assert "rm" in reason
 
     def test_whitelist_with_pipe(self):
         allowed, _ = validate_command(

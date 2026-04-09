@@ -52,8 +52,9 @@ async def test_background_lifecycle():
 
     status_json = await server.get_task_status(task_id=task_id)
     status = json.loads(status_json)
-    assert status["status"] in ("completed", "success")
+    assert status["status"] == "completed"
     assert status["result"]["stdout"].strip() == "lifecycle"
+    assert status["result"]["status"] == "success"
 
 
 @pytest.mark.asyncio
@@ -116,3 +117,14 @@ async def test_whitelist_mode():
     # Blocked
     r = json.loads(await server.execute_shell_command(command="cat /etc/passwd"))
     assert r["status"] == "rejected"
+
+
+@pytest.mark.asyncio
+async def test_invalid_shell_returns_structured_error():
+    result_json = await server.execute_shell_command(
+        command="echo test", shell="/definitely/not/a/shell"
+    )
+    result = json.loads(result_json)
+    assert result["status"] == "error"
+    assert result["exit_code"] is None
+    assert "Failed to start command" in result["stderr"]

@@ -8,7 +8,7 @@ Guidelines for AI agents working on this codebase.
 
 ## Architecture
 
-```
+```text
 src/shell_mcp/
 ├── config.py          # ShellMCPConfig dataclass, YAML loading, resolve_shell()
 ├── command_parser.py  # extract_command_names(), validate_command()
@@ -20,7 +20,8 @@ src/shell_mcp/
 ```
 
 **Dependency flow** (no circular imports):
-```
+
+```text
 cli.py -> server.py -> config.py
                     -> command_parser.py
                     -> executor.py
@@ -28,26 +29,32 @@ cli.py -> server.py -> config.py
                     -> keepalive.py
 ```
 
-`server.py` is the only module that imports `mcp`. All others are pure Python/asyncio.
+`server.py` owns the MCP tool registrations, and `keepalive.py` imports the MCP `Context` type/helper used for HTTP keepalive. The remaining modules stay pure Python/asyncio.
 
 ## Key Patterns
 
 ### Module-level globals in server.py
+
 `config` and `task_manager` are module-level globals set by `cli.py` before `mcp.run()`. Tools read from these at call time.
 
 ### Config priority
+
 CLI args > YAML file > dataclass defaults. Handled by `load_config()` in `config.py`.
 
 ### Non-interactive execution
+
 All subprocesses use `stdin=subprocess.DEVNULL` and inject env vars (`GIT_TERMINAL_PROMPT=0`, `CI=true`, `DEBIAN_FRONTEND=noninteractive`).
 
 ### Command security
-`command_parser.py` uses a quote-aware state machine to split by shell operators. It recursively parses `$()`, backticks, and `bash/sh -c "..."`. Both `extract_command_names()` and `validate_command()` are pure functions with no side effects.
+
+`command_parser.py` uses a quote-aware state machine to split by shell operators. It recursively parses `$()`, backticks, `env ... cmd`, and `bash/sh -c "..."`. Both `extract_command_names()` and `validate_command()` are pure functions with no side effects.
 
 ### Background tasks
+
 `TaskManager` wraps each background command in an `asyncio.Task`. The `cleanup()` method cancels all running tasks -- call it on shutdown or in test teardown.
 
 ### Output truncation
+
 Proportional: stdout gets first claim, stderr gets remainder. Both capped to `max_output_length` total. A `truncated: bool` flag is set on the result.
 
 ## Development Commands

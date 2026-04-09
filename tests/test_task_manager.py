@@ -1,11 +1,23 @@
 """Tests for task_manager module."""
 
 import asyncio
+import os
+import shlex
 
 import pytest
 
 from shell_mcp.config import ShellMCPConfig
 from shell_mcp.task_manager import TaskManager
+
+
+def _pid_exists(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
 
 
 @pytest.fixture
@@ -31,7 +43,7 @@ async def test_completion(manager):
     await asyncio.sleep(0.5)
     task = await manager.get_task(task_id)
     assert task is not None
-    assert task.status in ("completed", "success")
+    assert task.status == "completed"
     assert task.result is not None
     assert task.result.stdout.strip() == "done"
 
@@ -54,6 +66,47 @@ async def test_stop_task(manager):
     task = await manager.get_task(task_id)
     assert task is not None
     assert task.status == "killed"
+
+
+@pytest.mark.asyncio
+async def test_stop_task_kills_process_group(manager, tmp_path):
+    pid_file = tmp_path / "task.pid"
+    python_code = (
+        "import os, pathlib, time; "
+        f"pathlib.Path({str(pid_file)!r}).write_text(str(os.getpid())); "
+        "time.sleep(60)"
+    )
+    command = f"python3 -c {shlex.quote(python_code)}"
+
+    task_id = await manager.start_task(command, "/bin/sh", 300)
+
+    for _ in range(20):
+        if pid_file.exists():
+            break
+        await asyncio.sleep(0.05)
+
+    assert pid_file.exists()
+    pid = int(pid_file.read_text())
+
+    stopped = await manager.stop_task(task_id)
+    assert stopped is True
+
+    for _ in range(20):
+        task = await manager.get_task(task_id)
+        if task is not None and task.status == "killed":
+            break
+        await asyncio.sleep(0.05)
+
+    task = await manager.get_task(task_id)
+    assert task is not None
+    assert task.status == "killed"
+
+    for _ in range(20):
+        if not _pid_exists(pid):
+            break
+        await asyncio.sleep(0.05)
+
+    assert not _pid_exists(pid)
 
 
 @pytest.mark.asyncio
@@ -85,3 +138,14 @@ async def test_timeout_in_background(manager):
     assert task is not None
     assert task.status == "timeout"
     await mgr.cleanup()
+
+
+@pytest.mark.asyncio
+async def test_background_start_failure_records_error_result(manager):
+    task_id = await manager.start_task("echo hello", "/definitely/not/a/shell", 10)
+    await asyncio.sleep(0.1)
+    task = await manager.get_task(task_id)
+    assert task is not None
+    assert task.status == "error"
+    assert task.result is not None
+    assert "Failed to start command" in task.result.stderr

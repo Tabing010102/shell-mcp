@@ -81,7 +81,7 @@ Add to `claude_desktop_config.json`:
 Execute a shell command in foreground or background.
 
 | Parameter | Type | Default | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `command` | `str` | required | Shell command to execute |
 | `background` | `bool` | `false` | Run in background, return task_id immediately |
 | `timeout` | `float \| null` | config default (30s) | Timeout in seconds |
@@ -114,12 +114,15 @@ Status values: `success`, `error`, `timeout`, `rejected` (blocked by blacklist/w
 }
 ```
 
+Background task status values reported by `get_task_status`: `running`, `completed`, `error`, `timeout`, `killed`.
+If a task has a `result`, then `result.status` uses foreground-style values such as `success`, `error`, or `timeout`.
+
 ### `get_task_status`
 
 Query a background task by ID.
 
 | Parameter | Type | Description |
-|---|---|---|
+| --- | --- | --- |
 | `task_id` | `str` | Task ID from `execute_shell_command` |
 
 ### `stop_background_task`
@@ -127,7 +130,7 @@ Query a background task by ID.
 Stop a running background task.
 
 | Parameter | Type | Description |
-|---|---|---|
+| --- | --- | --- |
 | `task_id` | `str` | Task ID to stop |
 
 ### `list_background_tasks`
@@ -139,7 +142,7 @@ List all background tasks (running and completed). No parameters.
 See [`config.yaml.example`](config.yaml.example) for all options:
 
 | Option | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `shell` | `""` (auto-detect) | Shell executable. Auto-detect: `$SHELL` -> `/bin/sh` |
 | `default_timeout` | `30.0` | Default command timeout in seconds |
 | `max_output_length` | `50000` | Max total chars for stdout + stderr |
@@ -163,6 +166,7 @@ The command parser extracts **all** command names from a shell string, including
 Each extracted command is checked against the whitelist (if set) or blacklist.
 
 Interactive prompts are prevented by:
+
 - Redirecting `stdin` from `/dev/null`
 - Setting `GIT_TERMINAL_PROMPT=0`
 - Setting `CI=true`

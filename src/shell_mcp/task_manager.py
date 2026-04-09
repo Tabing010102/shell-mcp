@@ -52,6 +52,7 @@ class TaskManager:
         )
 
         async def _run() -> None:
+            started = time.monotonic()
             try:
                 result = await execute_command(
                     command=command,
@@ -63,15 +64,26 @@ class TaskManager:
                 )
                 async with self._lock:
                     bg_task.result = result
-                    bg_task.status = result.status
+                    bg_task.status = _task_status_from_result(result)
                     bg_task.completed_at = time.time()
             except asyncio.CancelledError:
                 async with self._lock:
                     bg_task.status = "killed"
                     bg_task.completed_at = time.time()
                 raise
-            except Exception:
+            except Exception as exc:
                 async with self._lock:
+                    bg_task.result = CommandResult(
+                        status="error",
+                        exit_code=None,
+                        stdout="",
+                        stderr=(
+                            f"Background task failed: {type(exc).__name__}: {exc}"
+                        ),
+                        execution_time=round(time.monotonic() - started, 3),
+                        truncated=False,
+                        command=command,
+                    )
                     bg_task.status = "error"
                     bg_task.completed_at = time.time()
 
@@ -117,3 +129,10 @@ class TaskManager:
                     await asyncio.wait_for(task._asyncio_task, timeout=1.0)
                 except (asyncio.TimeoutError, asyncio.CancelledError):
                     pass
+
+
+def _task_status_from_result(result: CommandResult) -> str:
+    """Map a command result to the public background task status."""
+    if result.status == "success":
+        return "completed"
+    return result.status

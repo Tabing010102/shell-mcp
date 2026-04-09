@@ -2,7 +2,7 @@
 
 import pytest
 
-from shell_mcp.executor import execute_command
+from shell_mcp.executor import _truncate_output, execute_command
 
 
 @pytest.mark.asyncio
@@ -43,6 +43,12 @@ async def test_output_truncation():
     assert len(result.stdout) + len(result.stderr) <= 150  # some tolerance for marker
 
 
+def test_output_truncation_respects_small_budget():
+    truncated, stdout, stderr = _truncate_output("abcdefghij", "klmnopqrst", 5)
+    assert truncated is True
+    assert len(stdout) + len(stderr) <= 5
+
+
 @pytest.mark.asyncio
 async def test_stdin_devnull():
     """cat with no args reads stdin; with DEVNULL it gets EOF immediately."""
@@ -63,6 +69,26 @@ async def test_environment_override():
         "echo $MY_TEST_VAR", "/bin/sh", 10, 50000, {"MY_TEST_VAR": "hello_test"}
     )
     assert result.stdout.strip() == "hello_test"
+
+
+@pytest.mark.asyncio
+async def test_invalid_shell_returns_error_result():
+    result = await execute_command(
+        "echo hi", "/definitely/not/a/shell", 10, 50000, {}
+    )
+    assert result.status == "error"
+    assert result.exit_code is None
+    assert "Failed to start command" in result.stderr
+
+
+@pytest.mark.asyncio
+async def test_invalid_working_directory_returns_error_result():
+    result = await execute_command(
+        "pwd", "/bin/sh", 10, 50000, {}, cwd="/definitely/not/a/dir"
+    )
+    assert result.status == "error"
+    assert result.exit_code is None
+    assert "Failed to start command" in result.stderr
 
 
 @pytest.mark.asyncio
