@@ -9,6 +9,25 @@ from shell_mcp.config import ShellMCPConfig
 from shell_mcp.task_manager import TaskManager
 
 
+def test_configure_mcp_runtime_updates_http_settings():
+    original_host = server.mcp.settings.host
+    original_port = server.mcp.settings.port
+    original_transport_security = server.mcp.settings.transport_security
+
+    try:
+        server.configure_mcp_runtime(
+            ShellMCPConfig(host="0.0.0.0", port=9001)
+        )
+
+        assert server.mcp.settings.host == "0.0.0.0"
+        assert server.mcp.settings.port == 9001
+        assert server.mcp.settings.transport_security is None
+    finally:
+        server.mcp.settings.host = original_host
+        server.mcp.settings.port = original_port
+        server.mcp.settings.transport_security = original_transport_security
+
+
 @pytest.fixture(autouse=True)
 async def reset_server_globals():
     """Reset server globals before each test and cleanup after."""
@@ -128,3 +147,22 @@ async def test_invalid_shell_returns_structured_error():
     assert result["status"] == "error"
     assert result["exit_code"] is None
     assert "Failed to start command" in result["stderr"]
+
+
+@pytest.mark.asyncio
+async def test_expired_background_task_returns_not_found():
+    import asyncio
+
+    cfg = ShellMCPConfig(completed_task_ttl=0.1)
+    server.config = cfg
+    server.task_manager = TaskManager(cfg)
+
+    result = json.loads(
+        await server.execute_shell_command(command="echo ttl", background=True)
+    )
+    task_id = result["task_id"]
+
+    await asyncio.sleep(0.4)
+
+    status = json.loads(await server.get_task_status(task_id=task_id))
+    assert "error" in status

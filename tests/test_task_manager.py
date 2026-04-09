@@ -10,6 +10,17 @@ from shell_mcp.config import ShellMCPConfig
 from shell_mcp.task_manager import TaskManager
 
 
+async def _wait_for_terminal_task(
+    manager: TaskManager, task_id: str, attempts: int = 50
+):
+    for _ in range(attempts):
+        task = await manager.get_task(task_id)
+        if task is not None and task.status != "running":
+            return task
+        await asyncio.sleep(0.02)
+    pytest.fail(f"Task {task_id} did not reach a terminal state in time")
+
+
 def _pid_exists(pid: int) -> bool:
     try:
         os.kill(pid, 0)
@@ -149,3 +160,32 @@ async def test_background_start_failure_records_error_result(manager):
     assert task.status == "error"
     assert task.result is not None
     assert "Failed to start command" in task.result.stderr
+
+
+@pytest.mark.asyncio
+async def test_completed_tasks_expire_after_ttl():
+    mgr = TaskManager(ShellMCPConfig(completed_task_ttl=0.25))
+
+    task_id = await mgr.start_task("echo expire-me", "/bin/sh", 10)
+
+    task = await _wait_for_terminal_task(mgr, task_id)
+    assert task.status == "completed"
+
+    await asyncio.sleep(0.35)
+
+    assert await mgr.get_task(task_id) is None
+    await mgr.cleanup()
+
+
+@pytest.mark.asyncio
+async def test_completed_task_ttl_zero_disables_expiry():
+    mgr = TaskManager(ShellMCPConfig(completed_task_ttl=0))
+
+    task_id = await mgr.start_task("echo keep-me", "/bin/sh", 10)
+    await asyncio.sleep(0.2)
+    await asyncio.sleep(0.2)
+
+    task = await mgr.get_task(task_id)
+    assert task is not None
+    assert task.status == "completed"
+    await mgr.cleanup()

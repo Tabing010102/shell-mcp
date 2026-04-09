@@ -13,6 +13,10 @@ max_output_length: 50000
 # Keepalive interval in seconds (progress pings during long foreground commands)
 keepalive_interval: 5.0
 
+# Seconds to retain completed background task records in memory.
+# Set to 0 to keep completed tasks until the server exits.
+completed_task_ttl: 3600.0
+
 # Commands to block (checked against all commands in pipes, &&, ||, etc.)
 blacklist:
   - rm

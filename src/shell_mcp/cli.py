@@ -39,6 +39,16 @@ def _parse_args() -> argparse.Namespace:
         help="Max output length in chars",
     )
     parser.add_argument(
+        "--completed-task-ttl",
+        type=float,
+        default=None,
+        dest="completed_task_ttl",
+        help=(
+            "Seconds to retain completed background tasks in memory "
+            "(0 disables expiry)"
+        ),
+    )
+    parser.add_argument(
         "--shell", default=None, help="Shell to use (auto-detect if empty)"
     )
     parser.add_argument(
@@ -57,7 +67,15 @@ def _parse_args() -> argparse.Namespace:
 def _build_cli_overrides(args: argparse.Namespace) -> dict:
     """Convert argparse namespace to dict of non-None overrides."""
     overrides: dict = {}
-    for key in ("transport", "host", "port", "default_timeout", "max_output_length", "shell"):
+    for key in (
+        "transport",
+        "host",
+        "port",
+        "default_timeout",
+        "max_output_length",
+        "completed_task_ttl",
+        "shell",
+    ):
         val = getattr(args, key, None)
         if val is not None:
             overrides[key] = val
@@ -82,8 +100,9 @@ def main() -> None:
     # Set module-level globals in server
     server.config = cfg
     server.task_manager = TaskManager(cfg)
+    server.configure_mcp_runtime(cfg)
 
-    server.mcp.run(transport=cfg.transport, host=cfg.host, port=cfg.port)
+    server.mcp.run(transport=cfg.transport)
 
 
 if __name__ == "__main__":

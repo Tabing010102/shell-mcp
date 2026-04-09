@@ -7,6 +7,7 @@ import json
 from typing import Any
 
 from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from .command_parser import validate_command
 from .config import ShellMCPConfig, resolve_shell
@@ -19,6 +20,32 @@ config: ShellMCPConfig = ShellMCPConfig()
 task_manager: TaskManager = TaskManager(config)
 
 mcp = FastMCP("shell-mcp", json_response=True)
+
+
+def _default_transport_security_for_host(
+    host: str,
+) -> TransportSecuritySettings | None:
+    """Mirror FastMCP's default transport security selection for a host."""
+    if host in ("127.0.0.1", "localhost", "::1"):
+        return TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*"],
+            allowed_origins=[
+                "http://127.0.0.1:*",
+                "http://localhost:*",
+                "http://[::1]:*",
+            ],
+        )
+    return None
+
+
+def configure_mcp_runtime(cfg: ShellMCPConfig) -> None:
+    """Apply runtime HTTP settings to the FastMCP instance."""
+    mcp.settings.host = cfg.host
+    mcp.settings.port = cfg.port
+    mcp.settings.transport_security = _default_transport_security_for_host(
+        cfg.host
+    )
 
 
 def _result_to_dict(obj: Any) -> dict:

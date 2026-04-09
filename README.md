@@ -6,7 +6,7 @@ MCP server for shell command execution. Allows LLMs to run shell commands with s
 
 - **Dual transport**: stdio (local) and streamable-http (remote)
 - **Foreground/background execution**: LLM controls execution mode per command
-- **Background task management**: query status, stop, list -- all state in memory
+- **Background task management**: query status, stop, list -- state is kept in memory with configurable TTL cleanup for completed tasks
 - **Security**: blacklist/whitelist with recursive parsing (pipes, `&&`, `||`, `;`, `$()`, backticks, `bash -c`)
 - **Non-interactive**: `stdin=DEVNULL` + env vars prevent interactive prompts (git, apt, etc.)
 - **Output control**: configurable max length with proportional truncation and truncation flag
@@ -52,6 +52,7 @@ uv run shell-mcp \
   --shell /bin/bash \
   --timeout 60 \
   --max-output-length 100000 \
+  --completed-task-ttl 3600 \
   --blacklist "rm,mkfs,dd,format" \
   --whitelist ""
 ```
@@ -116,6 +117,7 @@ Status values: `success`, `error`, `timeout`, `rejected` (blocked by blacklist/w
 
 Background task status values reported by `get_task_status`: `running`, `completed`, `error`, `timeout`, `killed`.
 If a task has a `result`, then `result.status` uses foreground-style values such as `success`, `error`, or `timeout`.
+Completed background task records are retained for `completed_task_ttl` seconds (default: 3600). Set it to `0` to keep them until the server exits.
 
 ### `get_task_status`
 
@@ -147,6 +149,7 @@ See [`config.yaml.example`](config.yaml.example) for all options:
 | `default_timeout` | `30.0` | Default command timeout in seconds |
 | `max_output_length` | `50000` | Max total chars for stdout + stderr |
 | `keepalive_interval` | `5.0` | Progress ping interval (seconds) for HTTP keepalive |
+| `completed_task_ttl` | `3600.0` | Seconds to retain completed background task records in memory (`0` disables expiry) |
 | `blacklist` | `[]` | Commands to block |
 | `whitelist` | `[]` | If non-empty, ONLY these commands are allowed |
 | `transport` | `"stdio"` | `"stdio"` or `"streamable-http"` |

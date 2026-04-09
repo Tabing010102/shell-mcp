@@ -25,6 +25,7 @@ class ShellMCPConfig:
     default_timeout: float = 30.0
     max_output_length: int = 50_000
     keepalive_interval: float = 5.0
+    completed_task_ttl: float = 3600.0
     blacklist: list[str] = field(default_factory=list)
     whitelist: list[str] = field(default_factory=list)
     transport: str = "stdio"
