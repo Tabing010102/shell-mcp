@@ -28,6 +28,19 @@ def test_configure_mcp_runtime_updates_http_settings():
         server.mcp.settings.transport_security = original_transport_security
 
 
+def test_execute_shell_command_tool_schema_includes_parameter_descriptions():
+    tool = server.mcp._tool_manager._tools["execute_shell_command"]
+    properties = tool.parameters["properties"]
+
+    assert properties["command"]["description"] == "The shell command to execute."
+    assert properties["background"]["description"].startswith(
+        "If true, run in the background"
+    )
+    assert properties["output_truncation_mode"]["description"].startswith(
+        "How to truncate oversized output"
+    )
+
+
 @pytest.fixture(autouse=True)
 async def reset_server_globals():
     """Reset server globals before each test and cleanup after."""
@@ -147,6 +160,25 @@ async def test_invalid_shell_returns_structured_error():
     assert result["status"] == "error"
     assert result["exit_code"] is None
     assert "Failed to start command" in result["stderr"]
+
+
+@pytest.mark.asyncio
+async def test_execute_output_truncation_mode_override():
+    cfg = ShellMCPConfig(max_output_length=20, output_truncation_mode="head")
+    server.config = cfg
+    server.task_manager = TaskManager(cfg)
+
+    result_json = await server.execute_shell_command(
+        command=(
+            "python3 -c \"import sys; sys.stdout.write('ABCDEFGHIJKLMNOPQRSTUVWXYZ')\""
+        ),
+        output_truncation_mode="tail",
+    )
+    result = json.loads(result_json)
+
+    assert result["status"] == "success"
+    assert result["truncated"] is True
+    assert result["stdout"] == "[...truncated]UVWXYZ"
 
 
 @pytest.mark.asyncio

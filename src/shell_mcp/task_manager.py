@@ -6,10 +6,8 @@ import asyncio
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from .config import ShellMCPConfig
+from .config import OutputTruncationMode, ShellMCPConfig, normalize_output_truncation_mode
 
 from .executor import CommandResult, execute_command
 
@@ -42,10 +40,15 @@ class TaskManager:
         shell: str,
         timeout: float,
         cwd: str | None = None,
+        output_truncation_mode: OutputTruncationMode | None = None,
     ) -> str:
         """Launch a command in background, return task_id."""
         await self._prune_expired_tasks()
         await self._ensure_reaper_started()
+
+        resolved_output_truncation_mode = normalize_output_truncation_mode(
+            output_truncation_mode or self._config.output_truncation_mode
+        )
 
         task_id = uuid.uuid4().hex[:12]
         bg_task = BackgroundTask(
@@ -65,6 +68,7 @@ class TaskManager:
                     max_output_length=self._config.max_output_length,
                     env_overrides=self._config.non_interactive_env,
                     cwd=cwd,
+                    output_truncation_mode=resolved_output_truncation_mode,
                 )
                 async with self._lock:
                     bg_task.result = result

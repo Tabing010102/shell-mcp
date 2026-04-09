@@ -49,6 +49,32 @@ def test_output_truncation_respects_small_budget():
     assert len(stdout) + len(stderr) <= 5
 
 
+def test_output_truncation_tail_mode_keeps_suffix():
+    truncated, stdout, stderr = _truncate_output(
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+        "",
+        20,
+        "tail",
+    )
+
+    assert truncated is True
+    assert stderr == ""
+    assert stdout == "[...truncated]UVWXYZ"
+
+
+def test_output_truncation_head_mode_keeps_prefix():
+    truncated, stdout, stderr = _truncate_output(
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+        "",
+        20,
+        "head",
+    )
+
+    assert truncated is True
+    assert stderr == ""
+    assert stdout == "ABCDEF[...truncated]"
+
+
 @pytest.mark.asyncio
 async def test_stdin_devnull():
     """cat with no args reads stdin; with DEVNULL it gets EOF immediately."""

@@ -39,6 +39,16 @@ def _parse_args() -> argparse.Namespace:
         help="Max output length in chars",
     )
     parser.add_argument(
+        "--output-truncation-mode",
+        choices=["head", "tail"],
+        default=None,
+        dest="output_truncation_mode",
+        help=(
+            "How to truncate oversized output: 'head' keeps the beginning, "
+            "'tail' keeps the end"
+        ),
+    )
+    parser.add_argument(
         "--completed-task-ttl",
         type=float,
         default=None,
@@ -73,6 +83,7 @@ def _build_cli_overrides(args: argparse.Namespace) -> dict:
         "port",
         "default_timeout",
         "max_output_length",
+        "output_truncation_mode",
         "completed_task_ttl",
         "shell",
     ):

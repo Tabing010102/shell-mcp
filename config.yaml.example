@@ -10,6 +10,11 @@ default_timeout: 30.0
 # Max output length in characters (stdout + stderr combined)
 max_output_length: 50000
 
+# How to truncate oversized output.
+# tail = keep the end of the output (useful for build/test failures)
+# head = keep the beginning of the output
+output_truncation_mode: tail
+
 # Keepalive interval in seconds (progress pings during long foreground commands)
 keepalive_interval: 5.0
 

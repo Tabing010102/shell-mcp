@@ -1,5 +1,7 @@
 """Tests for config module."""
 
+import pytest
+
 from shell_mcp.config import load_config, resolve_shell
 
 
@@ -24,6 +26,7 @@ def test_load_config_merges_yaml_and_cli(tmp_path):
         "transport: streamable-http\n"
         "host: 0.0.0.0\n"
         "port: 9000\n"
+        "output_truncation_mode: head\n"
         "completed_task_ttl: 120.0\n"
         "blacklist:\n"
         "  - rm\n"
@@ -34,6 +37,7 @@ def test_load_config_merges_yaml_and_cli(tmp_path):
         config_path=str(config_file),
         cli_overrides={
             "port": 9100,
+            "output_truncation_mode": "tail",
             "completed_task_ttl": 15.0,
             "blacklist": ["echo"],
             "shell": "/bin/bash",
@@ -43,6 +47,15 @@ def test_load_config_merges_yaml_and_cli(tmp_path):
     assert cfg.transport == "streamable-http"
     assert cfg.host == "0.0.0.0"
     assert cfg.port == 9100
+    assert cfg.output_truncation_mode == "tail"
     assert cfg.completed_task_ttl == 15.0
     assert cfg.blacklist == ["echo"]
     assert cfg.shell == "/bin/bash"
+
+
+def test_load_config_rejects_invalid_output_truncation_mode(tmp_path):
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text("output_truncation_mode: backwards\n")
+
+    with pytest.raises(ValueError, match="output_truncation_mode"):
+        load_config(config_path=str(config_file))

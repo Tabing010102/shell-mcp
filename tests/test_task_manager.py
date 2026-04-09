@@ -163,6 +163,32 @@ async def test_background_start_failure_records_error_result(manager):
 
 
 @pytest.mark.asyncio
+async def test_background_task_output_truncation_mode_override():
+    mgr = TaskManager(
+        ShellMCPConfig(max_output_length=20, output_truncation_mode="head")
+    )
+
+    try:
+        task_id = await mgr.start_task(
+            (
+                "python3 -c \"import sys; "
+                "sys.stdout.write('ABCDEFGHIJKLMNOPQRSTUVWXYZ')\""
+            ),
+            "/bin/sh",
+            10,
+            output_truncation_mode="tail",
+        )
+
+        task = await _wait_for_terminal_task(mgr, task_id)
+
+        assert task.result is not None
+        assert task.result.truncated is True
+        assert task.result.stdout == "[...truncated]UVWXYZ"
+    finally:
+        await mgr.cleanup()
+
+
+@pytest.mark.asyncio
 async def test_completed_tasks_expire_after_ttl():
     mgr = TaskManager(ShellMCPConfig(completed_task_ttl=0.25))
 

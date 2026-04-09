@@ -10,6 +10,8 @@ import subprocess
 import time
 from dataclasses import dataclass
 
+from .config import OutputTruncationMode
+
 
 @dataclass
 class CommandResult:
@@ -31,6 +33,7 @@ async def execute_command(
     max_output_length: int,
     env_overrides: dict[str, str],
     cwd: str | None = None,
+    output_truncation_mode: OutputTruncationMode = "tail",
 ) -> CommandResult:
     """Execute a shell command and return the result."""
     merged_env = dict(os.environ)
@@ -58,6 +61,7 @@ async def execute_command(
             stderr=f"Failed to start command: {type(exc).__name__}: {exc}",
             elapsed=time.monotonic() - start,
             max_output_length=max_output_length,
+            output_truncation_mode=output_truncation_mode,
         )
 
     timed_out = False
@@ -87,6 +91,7 @@ async def execute_command(
             stderr=stderr,
             elapsed=time.monotonic() - start,
             max_output_length=max_output_length,
+            output_truncation_mode=output_truncation_mode,
         )
 
     stdout = stdout_bytes.decode("utf-8", errors="replace")
@@ -110,6 +115,7 @@ async def execute_command(
         stderr=stderr,
         elapsed=time.monotonic() - start,
         max_output_length=max_output_length,
+        output_truncation_mode=output_truncation_mode,
     )
 
 
@@ -121,9 +127,15 @@ def _build_result(
     stderr: str,
     elapsed: float,
     max_output_length: int,
+    output_truncation_mode: OutputTruncationMode = "tail",
 ) -> CommandResult:
     """Build a CommandResult with consistent truncation/rounding."""
-    truncated, stdout, stderr = _truncate_output(stdout, stderr, max_output_length)
+    truncated, stdout, stderr = _truncate_output(
+        stdout,
+        stderr,
+        max_output_length,
+        output_truncation_mode,
+    )
     return CommandResult(
         status=status,
         exit_code=exit_code,
@@ -167,11 +179,17 @@ async def _terminate_process(
 
 
 def _truncate_output(
-    stdout: str, stderr: str, max_length: int
+    stdout: str,
+    stderr: str,
+    max_length: int,
+    output_truncation_mode: OutputTruncationMode = "tail",
 ) -> tuple[bool, str, str]:
     """Truncate stdout and stderr to fit within max_length total.
 
     Prioritizes stdout. Returns (truncated, stdout, stderr).
+
+    output_truncation_mode="head" keeps the beginning of the stream.
+    output_truncation_mode="tail" keeps the end of the stream.
     """
     total = len(stdout) + len(stderr)
     if total <= max_length:
@@ -190,8 +208,16 @@ def _truncate_output(
         stderr_budget = min(len(stderr), max_length // 3)
         stdout_budget = max_length - stderr_budget
 
-    truncated_stdout, stdout_truncated = _fit_output_to_budget(stdout, stdout_budget)
-    truncated_stderr, stderr_truncated = _fit_output_to_budget(stderr, stderr_budget)
+    truncated_stdout, stdout_truncated = _fit_output_to_budget(
+        stdout,
+        stdout_budget,
+        output_truncation_mode,
+    )
+    truncated_stderr, stderr_truncated = _fit_output_to_budget(
+        stderr,
+        stderr_budget,
+        output_truncation_mode,
+    )
 
     return (
         stdout_truncated or stderr_truncated,
@@ -200,7 +226,11 @@ def _truncate_output(
     )
 
 
-def _fit_output_to_budget(text: str, budget: int) -> tuple[str, bool]:
+def _fit_output_to_budget(
+    text: str,
+    budget: int,
+    output_truncation_mode: OutputTruncationMode = "tail",
+) -> tuple[str, bool]:
     """Fit one output stream into the allotted final-size budget."""
     if budget <= 0:
         return ("", bool(text))
@@ -212,4 +242,6 @@ def _fit_output_to_budget(text: str, budget: int) -> tuple[str, bool]:
         return (marker[:budget], True)
 
     keep = budget - len(marker)
-    return (text[:keep] + marker, True)
+    if output_truncation_mode == "head":
+        return (text[:keep] + marker, True)
+    return (marker + text[-keep:], True)

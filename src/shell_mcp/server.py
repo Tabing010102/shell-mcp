@@ -4,13 +4,19 @@ from __future__ import annotations
 
 import dataclasses
 import json
-from typing import Any
+from typing import Annotated, Any
 
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+from pydantic import Field
 
 from .command_parser import validate_command
-from .config import ShellMCPConfig, resolve_shell
+from .config import (
+    OutputTruncationMode,
+    ShellMCPConfig,
+    normalize_output_truncation_mode,
+    resolve_shell,
+)
 from .executor import execute_command
 from .keepalive import run_with_keepalive
 from .task_manager import TaskManager
@@ -66,25 +72,55 @@ def _result_to_dict(obj: Any) -> dict:
 
 @mcp.tool()
 async def execute_shell_command(
-    command: str,
-    background: bool = False,
-    timeout: float | None = None,
-    shell: str = "",
-    cwd: str | None = None,
+    command: Annotated[
+        str,
+        Field(description="The shell command to execute."),
+    ],
+    background: Annotated[
+        bool,
+        Field(
+            description=(
+                "If true, run in the background and return a task_id immediately."
+            )
+        ),
+    ] = False,
+    timeout: Annotated[
+        float | None,
+        Field(
+            description="Timeout in seconds. If omitted, uses the server default."
+        ),
+    ] = None,
+    shell: Annotated[
+        str,
+        Field(
+            description=(
+                "Shell executable to use, for example /bin/bash. "
+                "Empty string means auto-detect."
+            )
+        ),
+    ] = "",
+    cwd: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Working directory for the command. If omitted, uses the "
+                "server's current directory."
+            )
+        ),
+    ] = None,
+    output_truncation_mode: Annotated[
+        OutputTruncationMode | None,
+        Field(
+            description=(
+                "How to truncate oversized output: 'tail' keeps the end, "
+                "'head' keeps the beginning. If omitted, uses the server "
+                "default."
+            )
+        ),
+    ] = None,
     ctx: Context = None,
 ) -> str:
-    """Execute a shell command.
-
-    Args:
-        command: The shell command to execute.
-        background: If True, run in background and return task_id immediately.
-        timeout: Timeout in seconds. If None, uses server default.
-        shell: Shell to use (e.g. /bin/bash). Empty means auto-detect.
-        cwd: Working directory. None means current directory.
-
-    Returns:
-        JSON string with execution result or background task info.
-    """
+    """Execute a shell command in the foreground or background."""
     # Validate against blacklist/whitelist
     allowed, reason = validate_command(command, config.blacklist, config.whitelist)
     if not allowed:
@@ -92,6 +128,9 @@ async def execute_shell_command(
 
     resolved_shell = resolve_shell(shell or config.shell)
     resolved_timeout = timeout if timeout is not None else config.default_timeout
+    resolved_output_truncation_mode = normalize_output_truncation_mode(
+        output_truncation_mode or config.output_truncation_mode
+    )
 
     if background:
         task_id = await task_manager.start_task(
@@ -99,6 +138,7 @@ async def execute_shell_command(
             shell=resolved_shell,
             timeout=resolved_timeout,
             cwd=cwd,
+            output_truncation_mode=resolved_output_truncation_mode,
         )
         return json.dumps({
             "task_id": task_id,
@@ -114,6 +154,7 @@ async def execute_shell_command(
         max_output_length=config.max_output_length,
         env_overrides=config.non_interactive_env,
         cwd=cwd,
+        output_truncation_mode=resolved_output_truncation_mode,
     )
 
     if ctx is not None:
@@ -125,15 +166,13 @@ async def execute_shell_command(
 
 
 @mcp.tool()
-async def get_task_status(task_id: str) -> str:
-    """Get status of a background task.
-
-    Args:
-        task_id: The task ID returned by execute_shell_command.
-
-    Returns:
-        JSON string with task status and result if completed.
-    """
+async def get_task_status(
+    task_id: Annotated[
+        str,
+        Field(description="The task ID returned by execute_shell_command."),
+    ]
+) -> str:
+    """Get the status of a background task."""
     task = await task_manager.get_task(task_id)
     if task is None:
         return json.dumps({"error": f"Task '{task_id}' not found"})
@@ -152,15 +191,13 @@ async def get_task_status(task_id: str) -> str:
 
 
 @mcp.tool()
-async def stop_background_task(task_id: str) -> str:
-    """Stop a running background task.
-
-    Args:
-        task_id: The task ID to stop.
-
-    Returns:
-        JSON string indicating success or failure.
-    """
+async def stop_background_task(
+    task_id: Annotated[
+        str,
+        Field(description="The task ID of the running background task to stop."),
+    ]
+) -> str:
+    """Stop a running background task."""
     stopped = await task_manager.stop_task(task_id)
     if stopped:
         return json.dumps({"status": "stopped", "task_id": task_id})
@@ -169,11 +206,7 @@ async def stop_background_task(task_id: str) -> str:
 
 @mcp.tool()
 async def list_background_tasks() -> str:
-    """List all background tasks.
-
-    Returns:
-        JSON array of task summaries.
-    """
+    """List all background tasks."""
     tasks = await task_manager.list_tasks()
     summaries = [
         {

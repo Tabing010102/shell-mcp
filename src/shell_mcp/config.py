@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
 import yaml
 
@@ -17,6 +17,9 @@ _DEFAULT_NON_INTERACTIVE_ENV: dict[str, str] = {
 }
 
 
+OutputTruncationMode = Literal["head", "tail"]
+
+
 @dataclass
 class ShellMCPConfig:
     """Shell MCP server configuration."""
@@ -24,6 +27,7 @@ class ShellMCPConfig:
     shell: str = ""
     default_timeout: float = 30.0
     max_output_length: int = 50_000
+    output_truncation_mode: OutputTruncationMode = "tail"
     keepalive_interval: float = 5.0
     completed_task_ttl: float = 3600.0
     blacklist: list[str] = field(default_factory=list)
@@ -34,6 +38,12 @@ class ShellMCPConfig:
     non_interactive_env: dict[str, str] = field(
         default_factory=lambda: dict(_DEFAULT_NON_INTERACTIVE_ENV)
     )
+
+    def __post_init__(self) -> None:
+        """Normalize configuration values that have constrained choices."""
+        self.output_truncation_mode = normalize_output_truncation_mode(
+            self.output_truncation_mode
+        )
 
 
 def resolve_shell(configured: str) -> str:
@@ -47,6 +57,16 @@ def resolve_shell(configured: str) -> str:
     if shell:
         return shell
     return "/bin/sh"
+
+
+def normalize_output_truncation_mode(mode: str) -> OutputTruncationMode:
+    """Normalize and validate an output truncation mode."""
+    normalized = mode.strip().lower()
+    if normalized not in {"head", "tail"}:
+        raise ValueError(
+            "output_truncation_mode must be either 'head' or 'tail'"
+        )
+    return cast(OutputTruncationMode, normalized)
 
 
 def load_config(
@@ -80,4 +100,6 @@ def _apply_dict_to_config(config: ShellMCPConfig, data: dict[str, Any]) -> None:
             continue
         if key not in valid_fields:
             continue
+        if key == "output_truncation_mode":
+            value = normalize_output_truncation_mode(str(value))
         setattr(config, key, value)

@@ -9,7 +9,7 @@ MCP server for shell command execution. Allows LLMs to run shell commands with s
 - **Background task management**: query status, stop, list -- state is kept in memory with configurable TTL cleanup for completed tasks
 - **Security**: blacklist/whitelist with recursive parsing (pipes, `&&`, `||`, `;`, `$()`, backticks, `bash -c`)
 - **Non-interactive**: `stdin=DEVNULL` + env vars prevent interactive prompts (git, apt, etc.)
-- **Output control**: configurable max length with proportional truncation and truncation flag
+- **Output control**: configurable max length, truncation direction, and truncation flag
 - **Timeout**: per-command timeout, auto-kill on expiry
 - **Keepalive**: periodic progress notifications for long-running commands over HTTP
 - **YAML config**: file-based configuration with CLI override support
@@ -52,6 +52,7 @@ uv run shell-mcp \
   --shell /bin/bash \
   --timeout 60 \
   --max-output-length 100000 \
+  --output-truncation-mode tail \
   --completed-task-ttl 3600 \
   --blacklist "rm,mkfs,dd,format" \
   --whitelist ""
@@ -88,6 +89,7 @@ Execute a shell command in foreground or background.
 | `timeout` | `float \| null` | config default (30s) | Timeout in seconds |
 | `shell` | `str` | `""` (auto-detect) | Shell to use (e.g. `/bin/bash`) |
 | `cwd` | `str \| null` | `null` | Working directory |
+| `output_truncation_mode` | `"head" \| "tail" \| null` | config default (`tail`) | `tail` keeps the end of oversized output, `head` keeps the beginning |
 
 **Foreground result:**
 
@@ -148,6 +150,7 @@ See [`config.yaml.example`](config.yaml.example) for all options:
 | `shell` | `""` (auto-detect) | Shell executable. Auto-detect: `$SHELL` -> `/bin/sh` |
 | `default_timeout` | `30.0` | Default command timeout in seconds |
 | `max_output_length` | `50000` | Max total chars for stdout + stderr |
+| `output_truncation_mode` | `"tail"` | Default truncation direction for oversized output (`tail` keeps the end, `head` keeps the beginning) |
 | `keepalive_interval` | `5.0` | Progress ping interval (seconds) for HTTP keepalive |
 | `completed_task_ttl` | `3600.0` | Seconds to retain completed background task records in memory (`0` disables expiry) |
 | `blacklist` | `[]` | Commands to block |
