@@ -2,6 +2,10 @@
 
 MCP server for shell command execution. Allows LLMs to run shell commands with security controls, background task management, and output handling.
 
+> [!NOTE]  
+> The PyPI distribution name is `tab-shell-mcp`, and the CLI command is `tab-shell-mcp`  
+> This project executes shell commands, so treat every command as potentially risky and judge before running.
+
 ## Features
 
 - **Dual transport**: stdio (local) and streamable-http (remote)
@@ -27,13 +31,13 @@ uv sync
 ### stdio (local, e.g. Claude Desktop)
 
 ```bash
-uv run shell-mcp
+uvx tab-shell-mcp
 ```
 
 ### streamable-http (remote)
 
 ```bash
-uv run shell-mcp --transport streamable-http --port 8000
+uvx tab-shell-mcp --transport streamable-http --port 8000
 ```
 
 ### With config file
@@ -41,13 +45,13 @@ uv run shell-mcp --transport streamable-http --port 8000
 ```bash
 cp config.yaml.example config.yaml
 # Edit config.yaml as needed
-uv run shell-mcp --config config.yaml
+uvx tab-shell-mcp --config config.yaml
 ```
 
 ### CLI flags (override config file)
 
 ```bash
-uv run shell-mcp \
+uvx tab-shell-mcp \
   --transport stdio \
   --shell /bin/bash \
   --timeout 60 \
@@ -68,8 +72,8 @@ Add to `claude_desktop_config.json`:
 {
   "mcpServers": {
     "shell": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/shell-mcp", "shell-mcp"],
+      "command": "uvx",
+      "args": ["tab-shell-mcp"],
       "env": {}
     }
   }
@@ -186,6 +190,9 @@ uv run pytest -v
 
 # Run specific test module
 uv run pytest tests/test_command_parser.py -v
+
+# Run the local server during development
+uv run tab-shell-mcp
 ```
 
 ## License

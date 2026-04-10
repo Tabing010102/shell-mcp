@@ -63,8 +63,8 @@ Proportional: stdout gets first claim, stderr gets remainder. Both capped to `ma
 uv sync                          # Install dependencies
 uv run pytest -v                 # Run all tests
 uv run pytest tests/test_command_parser.py -v  # Run specific module
-uv run shell-mcp                 # Run server (stdio)
-uv run shell-mcp --transport streamable-http   # Run server (HTTP)
+uv run tab-shell-mcp             # Run server (stdio)
+uv run tab-shell-mcp --transport streamable-http   # Run server (HTTP)
 ```
 
 ## Testing Conventions
