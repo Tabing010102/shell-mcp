@@ -1,6 +1,6 @@
 [project]
-name = "shell-mcp"
-version = "0.1.0"
+name = "tab-shell-mcp"
+version = "0.1.1"
 description = "MCP server for shell command execution"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [project.scripts]
-shell-mcp = "shell_mcp.cli:main"
+tab-shell-mcp = "shell_mcp.cli:main"
 
 [build-system]
 requires = ["hatchling"]
